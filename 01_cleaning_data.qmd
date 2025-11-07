@@ -1,0 +1,9 @@
+---
+title: "Acceleration Politics Report"
+format: html
+execute: 
+    echo: true
+---
+
+```{r load-packages}
+library(tidyverse)
