@@ -7,3 +7,33 @@ execute:
 
 ```{r load-packages}
 library(tidyverse)
+library(tidyr)
+library(tibble)
+library(Amelia)
+library(rstatix)
+library(readr)
+library(data.table)
+
+```
+
+
+```{r CDtoSD Cleaning}
+#load raw CDtoSD data
+p <- "data/raw/CDtoSD2020.txt"
+
+# Read delimited text file whose path is in p and returns a data.table. | tells it that it is pipe-delimited. 
+x <- fread(p, sep = "|", fill = TRUE, showProgress = FALSE)
+
+#View the new file
+View(x)
+
+#Save the new file
+saveRDS(xwalk, "data/processed/cd_sd_xwalk.rds")
+
+#xwalk <- readRDS("data/processed/cd_sd_xwalk.rds")
+
+
+#dplyr::glimpse(xwalk)
+
+#Drop all states except Arkansas
+
