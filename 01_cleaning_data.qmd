@@ -4,7 +4,7 @@ format: html
 execute: 
     echo: true
 ---
-
+## 1. Setup and Paths
 ```{r load-packages}
 library(tidyverse)
 library(tidyr)
@@ -13,27 +13,210 @@ library(Amelia)
 library(rstatix)
 library(readr)
 library(data.table)
+library(janitor)
+library(stringr)
+library(dyplr)
+library(here)
+```
+
+```{r setup-path}
+#Define file paths for
+    # raw Cook PVI file
+
+    #raw CCD LEA directory/enrollment file
+
+    # raw/processed CRDC course-taking file
+
+    #school to cd with enroll.csv (NCES crosswalk)
+
+    #processed output folder (data/processed)
 
 ```
 
 
+
+
+```{r load state and state fips datasets}
+    library(maps)
+    data(state.fips)
+    data(state)
+#create state_lookup
+    state_lookup <- state.fips %>%
+        distinct(fips, abb, polyname)
+``` 
+
+
 ```{r CDtoSD Cleaning}
+#Create the congressional district to school district "crosswalk" data and save it as xwalk
+
 #load raw CDtoSD data
-p <- "data/raw/CDtoSD2020.txt"
-
+    p <- "data/raw/CDtoSD2020.txt"
 # Read delimited text file whose path is in p and returns a data.table. | tells it that it is pipe-delimited. 
-x <- fread(p, sep = "|", fill = TRUE, showProgress = FALSE)
-
+    xwalk <- fread(p, sep = "|", fill = TRUE, showProgress = FALSE)
 #View the new file
-View(x)
-
+    View(xwalk)
 #Save the new file
-saveRDS(xwalk, "data/processed/cd_sd_xwalk.rds")
+    saveRDS(xwalk, "data/processed/cd_sd_xwalk.rds")
 
-#xwalk <- readRDS("data/processed/cd_sd_xwalk.rds")
+#Load xwalk data and view
+    xwalk <- readRDS("data/processed/cd_sd_xwalk.rds")
+    dplyr::glimpse(xwalk)
 
-
-#dplyr::glimpse(xwalk)
-
+#Keep the leading zero in GEOID_CD118_20, change column polyname to state
+    xwalk <- xwalk %>%
+        mutate(
+            state_fips = sprintf("%02d", as.integer(GEOID_CD118_20) %/% 100),
+            state = state_lookup$polyname[
+                match(state_fips, sprintf("%02d", state_lookup$fips))] 
+        )
 #Drop all states except Arkansas
+    xwalk_ar <- xwalk |> dplyr:: filter(state == "arkansas")
+xwalk
+
+#Rename Columns
+
+```
+
+## 2. Clean Cook PVI (Step A)
+# cookpvi-load-clean
+    # 1. Read Cook PVI raw file. 
+
+    # 2. clean_names() to standardize column names. 
+
+    # 3. Keep only needed columns: dist, raw_pvi, etc. 
+
+   # cookpvi-parse-pvi
+    # 1. separate (dist) into stabbr (state abbr) and distnum (CD number) using "-"
+
+    # 2. Zero-pad distnum so "1" -> "01", etc. Ensure format matches cong_dist in the school crosswalk. 
+
+    # 3. Create:
+        - pvi_party: "R", "D", "EVEN" based on raw_pvi string. 
+        - pvi_num: numeric size (6, 3, etc.)
+        - pvi_cont: signed PVI (R = +, D = -, EVEN = 0) 
+
+   # cookpvi-sanity-checks
+     # 1. Tabulate pvi_party to confirm coding worked.
+     # 2. Look at rows where raw_pvi is missing or weird (e.g., "Vacant").
+     # 3. Decide how to handle "Vacant"/missing:
+            - Drop?
+            - Keep with pvi_cont = NA?
+    # 4. Save a cleaned Cook PVI file (optional) for transparency. e.g., write_csv(cookpvi_clean, "data/processed/cookpvi_clean.csv")   
+
+
+## 3. Build CD -> SD weighting bridge (Step B)
+    # ---- sch-xwalk-load ----
+        # 1. Read school_to_cd_with_enroll.csv.
+        # 2. clean_names().
+        # 3. Confirm columns: schid, leaid, cong_dist, enroll.
+
+    # ---- sch-xwalk-parse-cd ----
+        # 1. Separate cong_dist into stabbr + distnum using "-".
+        # 2. Zero-pad distnum to match Cook PVI format.
+        # 3. Check for any missing or unexpected cong_dist values.
+
+    # ---- sch-xwalk-join-pvi ----
+        # 1. left_join() Cook PVI (stabbr + distnum + pvi_cont) onto school-level crosswalk.
+        # 2. Check:
+        #    - how many schools got a non-missing pvi_cont
+        #    - how many have NA (no PVI coverage)
+
+    # ---- sch-xwalk-weight-to-district ----
+        # 1. Group by leaid (school district).
+        # 2. For each district:
+        #    - count number of schools (n_schools)
+        #    - count number with non-missing pvi_cont (n_with_pvi)
+        #    - compute pvi_district_wt = weighted.mean(pvi_cont, w = enroll, na.rm = TRUE),
+        #      but only if at least one school has pvi_cont.
+        #    - if no schools with PVI, set pvi_district_wt = NA, keep this info.
+        # 3. Ungroup and inspect:
+        #    - distribution of pvi_district_wt
+        #    - number of districts with NA PVI.
+
+# ---- sch-xwalk-save-cd-to-sd ----
+        # 1. Save district-level PVI file as:
+        #    "data/processed/CDtoSD_pvi.csv"
+        #    with columns: leaid, pvi_district_wt, n_schools, n_with_pvi.
+
+## 4 Prepare CCD district file (Step C - CCD side)
+    # ---- ccd-load ----
+    # 1. Read CCD LEA directory/enrollment file.
+    # 2. clean_names().
+
+    # ---- ccd-filter-ar ----
+    # 1. Filter to Arkansas only (state == "AR" or matching AR’s code).
+    # 2. Confirm number of districts.
+
+    # ---- ccd-construct-vars ----
+    # 1. Ensure leaid is character and consistent with other files.
+    # 2. Construct or clean:
+    #    - enrollment: total students per district.
+    #    - frl_proxy: your FRL share proxy (if not already done).
+    #    - locale: categorical urban/suburb/town/rural variable.
+    #    - county_fips: either:
+    #        a) ensure existing county_fips is a 5-digit string, OR
+    #        b) build from separate state_fips + county_code.
+    # 3. Check for missing enrollment or extreme values.
+
+    # ---- ccd-skinny-save ----
+    # 1. Select only columns needed downstream:
+    #    leaid, state, enrollment, frl_proxy, locale, county_fips.
+    # 2. Save as:
+    #    "data/processed/ar_ccd_skinny.csv".
+
+
+## 5. Prepare cRDC course-taking file (Step C - CRDC side)
+    # ---- crdc-load ----
+        # 1. Read CRDC-based course-taking file (e.g., a1_by_district.csv).
+        # 2. clean_names().
+        # 3. Confirm key columns: leaid, alg7_count, alg8_count, a1_flag_grade7, a1_share, etc.
+
+    # ---- crdc-construct-offer-var ----
+        # 1. Create offer_78_alg:
+        #    - Binary indicator if district offers Algebra in grades 7 or 8.
+        #    - e.g., as.integer((alg7_count + alg8_count) > 0)
+        #       or using a1_flag_grade7 / a1_share logic.
+        # 2. Inspect distribution of offer_78_alg (table()).
+
+    # ---- crdc-skinny-save ----
+        # 1. Select only needed columns:
+        #    leaid, alg7_count, alg8_count, a1_flag_grade7, a1_share, offer_78_alg.
+        # 2. Save as:
+        #    "data/processed/ar_crdc_skinny.csv".
+
+## 6. Merge CCD + CRDC + PVI into modeling dataset (Step C + Merge)
+    # ---- merge-load-processed ----
+    # 1. Read:
+    #    - "data/processed/ar_ccd_skinny.csv"
+    #    - "data/processed/ar_crdc_skinny.csv"
+    #    - "data/processed/CDtoSD_pvi.csv"
+
+    # ---- merge-build-ar-dataset ----
+    # 1. Start from AR CCD skinny (one row per district).
+    # 2. left_join() CRDC skinny by leaid (adds offer_78_alg + course counts).
+    # 3. left_join() CDtoSD_pvi by leaid (adds pvi_district_wt).
+    # 4. rename pvi_district_wt → pvi.
+
+    # ---- merge-checks ----
+    # 1. Check:
+    #    - nrow(ar) before/after joins.
+    #    - number of districts with NA pvi.
+    #    - number of districts with NA offer_78_alg or missing enrollment.
+    # 2. Decide:
+    #    - Keep/drop districts with missing pvi?
+    #    - Keep a flag variable for missing pvi if needed for sensitivity checks.
+
+    # ---- merge-final-clean ----
+    # 1. Ensure:
+    #    - offer_78_alg is 0/1 integer.
+    #    - pvi is numeric, with reasonable range.
+    #    - log(enrollment) won’t blow up (no zeros).
+    # 2. Select final columns for modeling:
+    #    leaid, state, enrollment, frl_proxy, locale, county_fips,
+    #    pvi, offer_78_alg, (plus any extras you want later).
+
+    # ---- merge-save-model-ready ----
+    # 1. Save final modeling dataset:
+    #    "data/processed/ar_model_ready.csv"
+    # 2. Optionally, also save an RDS version for faster loading.
 

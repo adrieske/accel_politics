@@ -1,0 +1,91 @@
+---
+title: "pvi_acc_analysis"
+format: html
+execute: 
+    echo: true
+---
+
+### (Analysis: descriptives, logit, marginal effects, robustness)
+## 1. Setup & data loading
+
+    # ---- setup-packages ----
+        # Load analysis packages:
+        # stats, dplyr, ggplot2 (if plotting), sandwich, lmtest, margins, broom, etc.
+
+    # ---- data-load-model-ready ----
+        # Read "data/processed/ar_model_ready.csv".
+        # Confirm:
+        # - number of districts
+        # - basic structure (glimpse())
+
+## 2. Descriptive checks & tables
+    # ---- desc-outcome ----
+        # 1. Table of offer_78_alg:
+        #    - how many districts offer early Algebra vs not.
+        # 2. Maybe cross-tab by locale.
+
+    # ---- desc-pvi ----
+        # 1. Summary stats for pvi (min, max, mean, sd).
+        # 2. Maybe histogram or simple plot of pvi distribution.
+
+    # ---- desc-covariates ----
+        # 1. Summary of enrollment, frl_proxy, and by locale.
+        # 2. Sanity checks: no extreme outliers or obvious data errors.
+
+## 3.  Baseline logit model (Step D)
+    # ---- model-logit-fit ----
+        # 1. Fit glm:
+        #    offer_78_alg ~ pvi + log(enrollment) + frl_proxy + as.factor(locale),
+        #    family = binomial(link = "logit").
+        # 2. Store model object (m_logit).
+
+    # ---- model-logit-clustered-se ----
+        # 1. Use vcovCL() with clustering at county_fips.
+        # 2. Store V_cl_logit.
+        # 3. Use coeftest() to print coefficients with clustered SEs.
+        # 4. Optionally, tidy results into a table for later export.
+
+## 4. Marginal effects for PVI (interpretation)
+    # ---- margins-pvi ----
+        # 1. Use margins() on m_logit with vcov = V_cl_logit.
+        # 2. Focus on variable "pvi".
+        # 3. Store the margins object (me_pvi).
+        # 4. summary(me_pvi) to get:
+        #    - Average marginal effect of PVI on probability of offering early Algebra.
+        #    - Translate into language: "A +1 point in PVI is associated with a X percentage point change..."
+
+    # ---- margins-pvi-plot (optional) ----
+        # 1. Optionally plot:
+        #    - predicted probability across PVI range,
+        #    - holding other covariates at typical values.
+        # 2. Save figure if you want it for slides/paper.
+
+## 5. Robustness check: Linear Probability Model
+    # ---- model-lpm-fit ----
+        # 1. Fit LPM:
+        #    offer_78_alg ~ pvi + log(enrollment) + frl_proxy + as.factor(locale)
+        #    using lm().
+        # 2. Clustered SEs with vcovCL() again (same clustering).
+
+    # ---- model-lpm-compare ----
+        # 1. Compare sign, magnitude, and significance of pvi:
+        #    - Does LPM tell the same story as logit?
+        # 2. Optionally, put logit + LPM results into a single comparison table.
+
+## 6. Sensitivity / missing PVI (optional, later)
+    # ---- sensitivity-missing-pvi ----
+        # 1. Examine districts with missing pvi:
+        #    - how many, and any patterns (e.g., charter-heavy)?
+        # 2. Optional sensitivity:
+        #    - Model with those districts dropped (main spec).
+        #    - Model with missing pvi imputed to state average (just to see if results change).
+        # 3. Record any differences in estimates of PVI effect.
+
+## 7. Export models & tables
+    # ---- export-models-tables ----
+        # 1. Save model objects (m_logit, m_lpm, me_pvi) as .rds in output/models/.
+        # 2. Create nicely formatted tables:
+        #    - Table: district counts & descriptives.
+        #    - Table: logit + LPM coefficients for key predictors.
+        # 3. Save tables/figures as PNGs or HTML in output/tables and output/figures.
+       
