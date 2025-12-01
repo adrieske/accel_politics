@@ -5,7 +5,7 @@ format: html
 
 ```{r setup}
 library(tidyverse)
-codes <- read.csv(C:\Users\adhill\accel_politics-1\data\raw\p1_heatmap_input.csv)
+codes <- read_csv("data/raw/p1_heatmap_input.csv")
 ```
 
 
@@ -16,18 +16,16 @@ codes <- codes |>
             equity_frame = Equity_Frame,
             risk_cues = Risk_Cues,
             placement_domain = Placement_Domain, 
-            implications_for_accel = Implications_for_Acceleration
-
-    )
+            implications_for_accel = Implications_for_Acceleration)
 #Multi-coding in single cell
 codes_long <- codes |> 
-    separate_rows(Leadership_Model, sep = ",",
-                  Objective, sep = ",",
-                  Equity_Frame, sep = ",",
-                  Risk_Cues, sep = ",",
-                  Placement_Domain, sep = ",",
-                  Implications_for_Acceleration, sep = ","      
-    )
+    separate_rows(c(leadership_model,
+                    objective,
+                    equity_frame,
+                    risk_cues,
+                    placement_domain,
+                    implications_for_accel),
+                  sep = ",")
 
 ```
 
