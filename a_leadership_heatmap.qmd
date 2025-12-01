@@ -10,8 +10,27 @@ codes <- read_csv("data/raw/p1_heatmap_input.csv")
 
 
 ```{r create codes columns}
-# Multi-coding in single cell
-codes_long <- codes |> 
+# Clean up strings, drop empty rows, and spread multi-codes
+codes_long <- codes |>
+    mutate(
+        across(
+            c(
+                leadership_model,
+                objective,
+                equity_frame,
+                risk_cues,
+                placement_domain,
+                implications_for_accel
+            ),
+            str_squish
+        )
+    ) |>
+    filter(
+        !is.na(leadership_model),
+        !is.na(objective),
+        leadership_model != "0",
+        objective != "0"
+    ) |>
     separate_rows(
         leadership_model,
         objective,
@@ -19,12 +38,38 @@ codes_long <- codes |>
         risk_cues,
         placement_domain,
         implications_for_accel,
-        sep = ","
+        sep = "\\s*,\\s*"
     )
+
+heatmap_data <- codes_long |>
+    count(leadership_model, objective, name = "articles")
 
 ```
 
-
-```{r}
-
+```{r leadership_objective_heatmap, fig.width=11, fig.height=8}
+heatmap_data |>
+    ggplot(
+        aes(
+            x = objective,
+            y = fct_rev(fct_infreq(leadership_model)),
+            fill = articles
+        )
+    ) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(
+        low = "#f1eef6",
+        high = "#91003f",
+        name = "Article count"
+    ) +
+    labs(
+        x = "Primary objective discussed",
+        y = "Leadership model",
+        title = "Leadership models mentioned across acceleration objectives",
+        subtitle = "Heatmap shows how often each leadership model co-occurs with an objective"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+        axis.text.x = element_text(angle = 40, hjust = 1),
+        panel.grid = element_blank()
+    )
 ```
