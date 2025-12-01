@@ -5,7 +5,7 @@ format: html
 
 ```{r setup}
 library(tidyverse)
-codes <- read.csv(C:\Users\adhill\accel_politics-1\data\raw\p1_heatmap_input.csv)
+codes <- read.csv("data/raw/p1_heatmap_input.csv")
 ```
 
 
